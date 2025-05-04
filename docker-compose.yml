@@ -1,0 +1,57 @@
+services:
+  nginx:
+    image: nginx:mainline-alpine3.21
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:8080:80
+    volumes:
+      - ./frontend_service:/var/www/web
+      - ./config/nginx:/etc/nginx/templates
+
+  centrifugo:
+    image: centrifugo/centrifugo:v6.1
+    restart: unless-stopped
+    command: centrifugo -c config.json
+    environment:
+      - CENTRIFUGO_ADMIN_PASSWORD=${CENTRIFUGO_ADMIN_PASSWORD}
+    volumes:
+      - ./config/centrifugo/config.json:/centrifugo/config.json
+    depends_on:
+      - keycloak
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2.0
+    restart: unless-stopped
+    command: start-dev
+    ports:
+      - 127.0.0.1:7070:8080
+    environment:
+      - KC_BOOTSTRAP_ADMIN_USERNAME=${KC_ADMIN_USER}
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=${KC_ADMIN_PASS}
+      - KC_HTTP_ENABLED=false
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://keycloakdb/${KC_DB_NAME}
+      - KC_DB_USERNAME=${KC_DB_USER}
+      - KC_DB_PASSWORD=${KC_DB_PASS}
+    depends_on:
+      - keycloakdb
+
+  keycloakdb:
+    image: postgres:17.4-alpine3.21
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:5432:5432
+    environment:
+      - POSTGRES_USER=${KC_DB_USER}
+      - POSTGRES_PASSWORD=${KC_DB_PASS}
+      - POSTGRES_DB=${KC_DB_NAME}
+    volumes:
+      - keycloakdb-data:/var/lib/postgresql/data
+
+
+volumes:
+  keycloakdb-data:

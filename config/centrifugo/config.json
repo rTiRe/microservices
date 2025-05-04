@@ -1,0 +1,24 @@
+{
+    "client": {
+        "allowed_origins": [
+            "*"
+        ],
+        "token": {
+            "user_id_claim": "sid",
+            "jwks_public_endpoint": "http://keycloak:8080/realms/myrealm/protocol/openid-connect/certs"
+        }
+    },
+    "channel": {
+        "without_namespace": {
+            "allow_subscribe_for_client": true,
+            "allow_subscribe_for_anonymous": true,
+            "allow_publish_for_client": true,
+            "allow_publish_for_anonymous": true,
+            "allow_publish_for_subscriber": true
+        }
+    },
+    "admin": {
+        "secret": "secret",
+        "enabled": true
+    }
+}
