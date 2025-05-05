@@ -41,3 +41,10 @@ SELECT EXISTS (
     WHERE c."id" = $2 
     AND uc."can_publish" = true
 ) AS "can_publish";
+
+-- name: SubscribeUserToChannel :exec
+INSERT INTO user_channel (user_id, chan_id, can_publish)
+SELECT $1, c.id, $3
+FROM channel c
+WHERE c.channel = $2
+ON CONFLICT (user_id, chan_id) DO NOTHING;

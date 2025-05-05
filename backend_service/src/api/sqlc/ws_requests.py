@@ -33,6 +33,15 @@ WHERE "id"=:p1
 """
 
 
+SUBSCRIBE_USER_TO_CHANNEL = """-- name: subscribe_user_to_channel \\:exec
+INSERT INTO user_channel (user_id, chan_id, can_publish)
+SELECT :p1, c.id, :p3
+FROM channel c
+WHERE c.channel = :p2
+ON CONFLICT (user_id, chan_id) DO NOTHING
+"""
+
+
 USER_CAN_PUBLISH = """-- name: user_can_publish \\:one
 SELECT EXISTS (
     SELECT 1 
@@ -98,6 +107,9 @@ class Querier:
             enabled=row[4],
         )
 
+    def subscribe_user_to_channel(self, *, user_id: uuid.UUID, channel: str, can_publish: bool) -> None:
+        self._conn.execute(sqlalchemy.text(SUBSCRIBE_USER_TO_CHANNEL), {"p1": user_id, "p2": channel, "p3": can_publish})
+
     def user_can_publish(self, *, user_id: uuid.UUID, id: int) -> Optional[bool]:
         row = self._conn.execute(sqlalchemy.text(USER_CAN_PUBLISH), {"p1": user_id, "p2": id}).first()
         if row is None:
@@ -137,7 +149,7 @@ class AsyncQuerier:
             )
 
     async def create_user(self, *, id: uuid.UUID, username: str, given_name: str, family_name: str, enabled: bool) -> None:
-        res = await self._conn.execute(sqlalchemy.text(CREATE_USER), {
+        await self._conn.execute(sqlalchemy.text(CREATE_USER), {
             "p1": id,
             "p2": username,
             "p3": given_name,
@@ -156,6 +168,9 @@ class AsyncQuerier:
             family_name=row[3],
             enabled=row[4],
         )
+
+    async def subscribe_user_to_channel(self, *, user_id: uuid.UUID, channel: str, can_publish: bool) -> None:
+        await self._conn.execute(sqlalchemy.text(SUBSCRIBE_USER_TO_CHANNEL), {"p1": user_id, "p2": channel, "p3": can_publish})
 
     async def user_can_publish(self, *, user_id: uuid.UUID, id: int) -> Optional[bool]:
         row = (await self._conn.execute(sqlalchemy.text(USER_CAN_PUBLISH), {"p1": user_id, "p2": id})).first()

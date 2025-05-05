@@ -125,13 +125,13 @@ document.getElementById("btnConnect").addEventListener("click", () => {
         messages.innerHTML += line;
     })
     let channel = document.createElement("li");
-    let disconnect_button = document.createElement("button");
+    // let disconnect_button = document.createElement("button");
     let watch_button = document.createElement("button");
-    disconnect_button.addEventListener("click", () => {
-        client.removeSubscription(sub);
-        channel.remove();
-    });
-    disconnect_button.innerHTML = "Disconnect";
+    // disconnect_button.addEventListener("click", () => {
+    //     client.removeSubscription(sub);
+    //     channel.remove();
+    // });
+    // disconnect_button.innerHTML = "Disconnect";
     watch_button.style.marginLeft = "5px";
     watch_button.addEventListener("click", () => {
         if (current_sub != sub) {
@@ -153,7 +153,7 @@ document.getElementById("btnConnect").addEventListener("click", () => {
     });
     watch_button.innerHTML = "Watch";
     channel.innerHTML = channel_name + " ";
-    channel.appendChild(disconnect_button);
+    // channel.appendChild(disconnect_button);
     channel.appendChild(watch_button);
     document.getElementById("subscriptions").appendChild(channel);
 });

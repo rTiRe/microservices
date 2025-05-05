@@ -7,9 +7,7 @@ import jwt
 from src.api.grpc.protobufs import proxy_pb2_grpc, proxy_pb2
 from src.api.sqlc import ws_requests
 from src.storage.postgres import engine
-
-
-PUBLIC_KEY = '-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApWUuKoo/aKrDUZxiWLQT7jl64cCLg2ibTrWRHcJdUakA/YEcSkqGs4vX3iWNcCwfjRkBgMes2/aCEC1LULX63OaZrsn7SmzT1jLrmynR6DN0GU4iYsGTYIG6EqxnRcia8G5xkY6adFmGEtL7tiwRKc2VFZOAT02o9ehu49yzHfM6aHkv1ioWOzm6EgrRKUssOTGGUaDVTsETlbF2/ZcvaMnJ9BLszBkdTcOPvQRKEldzWGR1ztmrqspHSZlyLWWEzZbOwDK8nYZjWyte6oLzQK092T6LtBTdpLR6u0AJclPGmycRg6nr645+LYKyuZweYZR94U3IJ8ZPsQx9aBed/QIDAQAB\n-----END PUBLIC KEY-----'
+from config import settings
 
 
 class ProxyService(proxy_pb2_grpc.CentrifugoProxyServicer):
@@ -27,7 +25,7 @@ class ProxyService(proxy_pb2_grpc.CentrifugoProxyServicer):
         context: grpc.aio.ServicerContext,
     ) -> proxy_pb2.ConnectResponse:
         data = json.loads(request.data.decode())
-        token_data =jwt.decode(data['token'], PUBLIC_KEY, algorithms=['RS256'], audience='account', verify=True)
+        token_data =jwt.decode(data['token'], settings.kc_public_key, algorithms=['RS256'], audience='account', verify=True)
         user_data = {
             'id': token_data['sub'],
             'username': token_data['preferred_username'],
@@ -52,3 +50,18 @@ class ProxyService(proxy_pb2_grpc.CentrifugoProxyServicer):
                 user=user_data['id'],
             ),
         )
+
+    async def Subscribe(
+        self,
+        request: proxy_pb2.SubscribeRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> proxy_pb2.SubscribeResponse:
+        async with engine.connect() as connection:
+            querier = ws_requests.AsyncQuerier(connection)
+            await querier.subscribe_user_to_channel(
+                user_id=request.user,
+                channel=request.channel,
+                can_publish=True,
+            )
+            await connection.commit()
+        return proxy_pb2.SubscribeResponse()
