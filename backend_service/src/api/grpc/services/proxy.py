@@ -65,3 +65,19 @@ class ProxyService(proxy_pb2_grpc.CentrifugoProxyServicer):
             )
             await connection.commit()
         return proxy_pb2.SubscribeResponse()
+
+    async def RPC(
+        self,
+        request: proxy_pb2.RPCRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> proxy_pb2.RPCResponse:
+        if request.method == 'get_user_channels':
+            async with engine.connect() as connection:
+                querier = ws_requests.AsyncQuerier(connection)
+                channels = [channel.channel async for channel in querier.chan_list_by_user_id(user_id=request.user)]
+            return proxy_pb2.RPCResponse(
+                result=proxy_pb2.RPCResult(
+                    data=f'{{ "channels": {json.dumps(channels)} }}'.encode(),
+                ),
+            )
+        return super().RPC(request, context)

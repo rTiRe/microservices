@@ -32,5 +32,13 @@
     "admin": {
         "secret": "secret",
         "enabled": true
+    },
+    "rpc": {
+        "proxy": {
+            "endpoint": "grpc://backend_service:1337"
+        },
+        "without_namespace": {
+            "proxy_enabled": true
+        }
     }
 }
