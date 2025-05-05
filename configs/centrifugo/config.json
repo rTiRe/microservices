@@ -3,6 +3,12 @@
         "allowed_origins": [
             "*"
         ],
+        "proxy": {
+            "connect": {
+                "enabled": true,
+                "endpoint": "grpc://backend_service:1337"
+            }
+        },
         "token": {
             "user_id_claim": "sid",
             "jwks_public_endpoint": "http://keycloak:8080/realms/myrealm/protocol/openid-connect/certs"

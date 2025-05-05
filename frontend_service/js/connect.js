@@ -32,36 +32,13 @@ const getToken = async () => {
         .then((result) => {
             console.log("token accepted");
             refresh_token = result.refresh_token;
+            console.log(result)
             return result.access_token;
         })
         .catch((error) => console.error(error));
 };
 
-const client = new Centrifuge(
-    "ws://127.0.0.1:8080/centrifugo/connection/websocket",
-    {
-        getToken: getToken,
-        debug: true,
-        resubscribe: true,
-    }
-);
-
-client.on("connected", () => {
-    password = null;
-    document.getElementById("password").value = "";
-    connected = true;
-    document.getElementById("loginForm").style.display = "none";
-    document.getElementById("userInfo").style.display = "flex";
-});
-
-client.on("disconnected", () => {
-    refresh_token = "";
-    client.setToken("");
-    connected = false;
-    document.getElementById("loginForm").style.display = "block";
-    document.getElementById("userInfo").style.display = "none";
-    document.getElementById("userHello").textContent = "Hello, " + username;
-});
+let client = undefined;
 
 document.getElementById("btnLogin").addEventListener("click", () => {
     if (connected) {
@@ -70,7 +47,30 @@ document.getElementById("btnLogin").addEventListener("click", () => {
     username = document.getElementById("username").value;
     password = document.getElementById("password").value;
     if (username != "" && password != "") {
-        client.connect();
+        getToken().then((token) => {
+            client = new Centrifuge(
+                "ws://127.0.0.1:8080/centrifugo/connection/websocket",
+                {
+                    data: { token: token }
+                }
+            );
+            client.on("connected", () => {
+                password = null;
+                document.getElementById("password").value = "";
+                connected = true;
+                document.getElementById("loginForm").style.display = "none";
+                document.getElementById("userInfo").style.display = "flex";
+                document.getElementById("userHello").textContent = "Hello, " + username;
+            });
+            client.on("disconnected", () => {
+                refresh_token = "";
+                client.setToken("");
+                connected = false;
+                document.getElementById("loginForm").style.display = "block";
+                document.getElementById("userInfo").style.display = "none";
+            });
+            client.connect();
+        });
     } else {
         console.error("empty username or password");
     }
@@ -160,7 +160,7 @@ document.getElementById("btnPublish").addEventListener("click", () => {
         current_sub.publish({
             from: username,
             message: messageInput.value
-        })
+        });
         messageInput.value = "";
     }
 });
