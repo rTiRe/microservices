@@ -88,7 +88,7 @@ class ProxyService(proxy_pb2_grpc.CentrifugoProxyServicer):
             await connection.commit()
         return proxy_pb2.ConnectResponse(
             result=proxy_pb2.ConnectResult(
-                user=user_data['id'],
+                user=user_id,
             ),
         )
 
