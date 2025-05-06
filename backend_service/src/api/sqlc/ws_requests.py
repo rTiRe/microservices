@@ -15,7 +15,7 @@ CHAN_LIST_BY_USER_ID = """-- name: chan_list_by_user_id \\:many
 SELECT "channel"."id", "channel"."channel", "channel"."title", "channel"."default"
 FROM "public"."channel"
 JOIN "public"."user_channel" ON "user_channel"."chan_id" = "channel"."id"
-WHERE "user_channel"."user_id"=:p1
+WHERE "user_channel"."user_id"=:p1 AND "user_channel"."can_subscribe"='t'
 """
 
 
@@ -47,7 +47,7 @@ SELECT EXISTS (
     SELECT 1 
     FROM "public"."channel" c
     JOIN "public"."user_channel" uc ON uc."chan_id" = c."id" AND uc."user_id" = :p1
-    WHERE c."id" = :p2 
+    WHERE c."channel" = :p2 
     AND uc."can_publish" = true
 ) AS "can_publish"
 """
@@ -58,7 +58,7 @@ SELECT EXISTS (
     SELECT 1 
     FROM "public"."channel" c
     LEFT JOIN "public"."user_channel" uc ON uc."chan_id" = c."id" AND uc."user_id" = :p1
-    WHERE c."id" = :p2 
+    WHERE c."channel" = :p2 
     AND (uc."can_subscribe" = true OR (uc."user_id" IS NULL AND c."default" = true))
 ) AS "can_subscribe"
 """
@@ -110,14 +110,14 @@ class Querier:
     def subscribe_user_to_channel(self, *, user_id: uuid.UUID, channel: str, can_publish: bool) -> None:
         self._conn.execute(sqlalchemy.text(SUBSCRIBE_USER_TO_CHANNEL), {"p1": user_id, "p2": channel, "p3": can_publish})
 
-    def user_can_publish(self, *, user_id: uuid.UUID, id: int) -> Optional[bool]:
-        row = self._conn.execute(sqlalchemy.text(USER_CAN_PUBLISH), {"p1": user_id, "p2": id}).first()
+    def user_can_publish(self, *, user_id: uuid.UUID, channel: str) -> Optional[bool]:
+        row = self._conn.execute(sqlalchemy.text(USER_CAN_PUBLISH), {"p1": user_id, "p2": channel}).first()
         if row is None:
             return None
         return row[0]
 
-    def user_can_subscribe(self, *, user_id: uuid.UUID, id: int) -> Optional[bool]:
-        row = self._conn.execute(sqlalchemy.text(USER_CAN_SUBSCRIBE), {"p1": user_id, "p2": id}).first()
+    def user_can_subscribe(self, *, user_id: uuid.UUID, channel: str) -> Optional[bool]:
+        row = self._conn.execute(sqlalchemy.text(USER_CAN_SUBSCRIBE), {"p1": user_id, "p2": channel}).first()
         if row is None:
             return None
         return row[0]
@@ -172,14 +172,14 @@ class AsyncQuerier:
     async def subscribe_user_to_channel(self, *, user_id: uuid.UUID, channel: str, can_publish: bool) -> None:
         await self._conn.execute(sqlalchemy.text(SUBSCRIBE_USER_TO_CHANNEL), {"p1": user_id, "p2": channel, "p3": can_publish})
 
-    async def user_can_publish(self, *, user_id: uuid.UUID, id: int) -> Optional[bool]:
-        row = (await self._conn.execute(sqlalchemy.text(USER_CAN_PUBLISH), {"p1": user_id, "p2": id})).first()
+    async def user_can_publish(self, *, user_id: uuid.UUID, channel: str) -> Optional[bool]:
+        row = (await self._conn.execute(sqlalchemy.text(USER_CAN_PUBLISH), {"p1": user_id, "p2": channel})).first()
         if row is None:
             return None
         return row[0]
 
-    async def user_can_subscribe(self, *, user_id: uuid.UUID, id: int) -> Optional[bool]:
-        row = (await self._conn.execute(sqlalchemy.text(USER_CAN_SUBSCRIBE), {"p1": user_id, "p2": id})).first()
+    async def user_can_subscribe(self, *, user_id: uuid.UUID, channel: str) -> Optional[bool]:
+        row = (await self._conn.execute(sqlalchemy.text(USER_CAN_SUBSCRIBE), {"p1": user_id, "p2": channel})).first()
         if row is None:
             return None
         return row[0]

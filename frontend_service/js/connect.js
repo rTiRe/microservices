@@ -9,12 +9,14 @@ headers.append("Content-Type", "application/x-www-form-urlencoded");
 
 function createSub(channel_name) {
     const sub = client.newSubscription(channel_name);
-    sub.on("subscription", (context) => console.log(context));
+    let channel = document.createElement("li");
     sub.on("publication", (msg) => {
         let line = `<p><strong>${msg.data.from}:</strong> ${msg.data.message}</p>`;
         messages.innerHTML += line;
-    })
-    let channel = document.createElement("li");
+    });
+    sub.on("subscribed", (context) => {
+        console.log(context);
+    });
     // let disconnect_button = document.createElement("button");
     let watch_button = document.createElement("button");
     // disconnect_button.addEventListener("click", () => {

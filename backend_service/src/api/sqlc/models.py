@@ -27,3 +27,4 @@ class UserChannel:
     user_id: uuid.UUID
     chan_id: int
     can_publish: bool
+    can_subscribe: bool

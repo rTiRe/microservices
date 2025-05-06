@@ -14,7 +14,7 @@ VALUES($1, $2, $3, $4, $5)
 SELECT "channel"."id", "channel"."channel", "channel"."title", "channel"."default"
 FROM "public"."channel"
 JOIN "public"."user_channel" ON "user_channel"."chan_id" = "channel"."id"
-WHERE "user_channel"."user_id"=$1
+WHERE "user_channel"."user_id"=$1 AND "user_channel"."can_subscribe"='t';
 ;
 
 -- name: UserListByChanID :many
@@ -29,7 +29,7 @@ SELECT EXISTS (
     SELECT 1 
     FROM "public"."channel" c
     LEFT JOIN "public"."user_channel" uc ON uc."chan_id" = c."id" AND uc."user_id" = $1
-    WHERE c."id" = $2 
+    WHERE c."channel" = $2 
     AND (uc."can_subscribe" = true OR (uc."user_id" IS NULL AND c."default" = true))
 ) AS "can_subscribe";
 
@@ -38,7 +38,7 @@ SELECT EXISTS (
     SELECT 1 
     FROM "public"."channel" c
     JOIN "public"."user_channel" uc ON uc."chan_id" = c."id" AND uc."user_id" = $1
-    WHERE c."id" = $2 
+    WHERE c."channel" = $2 
     AND uc."can_publish" = true
 ) AS "can_publish";
 

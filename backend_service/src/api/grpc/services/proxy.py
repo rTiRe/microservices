@@ -1,5 +1,6 @@
 import json
 import httpx
+import datetime
 
 import grpc
 import jwt
@@ -9,6 +10,13 @@ from src.api.sqlc import ws_requests
 from src.storage.postgres import engine
 from config import settings
 
+key_begin = '-----BEGIN PUBLIC KEY-----\n'
+key_end = '\n-----END PUBLIC KEY-----'
+client_key = ''
+backend_key = {
+    'token': '',
+    'expire_at': datetime.datetime.now(),
+}
 
 class ProxyService(proxy_pb2_grpc.CentrifugoProxyServicer):
     @staticmethod
@@ -25,18 +33,51 @@ class ProxyService(proxy_pb2_grpc.CentrifugoProxyServicer):
         context: grpc.aio.ServicerContext,
     ) -> proxy_pb2.ConnectResponse:
         data = json.loads(request.data.decode())
-        token_data =jwt.decode(data['token'], settings.kc_public_key, algorithms=['RS256'], audience='account', verify=True)
-        user_data = {
-            'id': token_data['sub'],
-            'username': token_data['preferred_username'],
-            'given_name': token_data['given_name'],
-            'family_name': token_data['family_name'],
-            'email': token_data['email'],
-        }
+        global client_key
+        if not client_key:
+            async with httpx.AsyncClient() as client:
+                config_data = (await client.get('http://keycloak:8080/realms/myrealm')).json()
+            client_key = config_data['public_key']
+            if not client_key.startswith(key_begin):
+                client_key = f'{key_begin}{client_key}'
+            if not client_key.endswith(key_end):
+                client_key = f'{client_key}{key_end}'
+        token_data =jwt.decode(data['token'], client_key, algorithms=['RS256'], audience='account', verify=True)
+        user_id = token_data['sub']
         async with engine.connect() as connection:
             querier = ws_requests.AsyncQuerier(connection)
-            user = await querier.get_user_by_id(id=user_data['id'])
+            user = await querier.get_user_by_id(id=user_id)
             if not user:
+                if backend_key['expire_at'] < datetime.datetime.now():
+                    async with httpx.AsyncClient() as client:
+                        backend_token = await client.post(
+                            'http://keycloak:8080/realms/myrealm/protocol/openid-connect/token',
+                            headers={
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                            },
+                            data={
+                                'client_id': 'backend',
+                                'grant_type': 'client_credentials',
+                                'client_secret': settings.KC_BACKEND_SECRET.get_secret_value(),
+                            },
+                        )
+                        backend_token = backend_token.json()
+                    backend_key['token'] = backend_token['access_token']
+                    backend_key['expire_at'] = datetime.datetime.now() + datetime.timedelta(seconds=backend_token['expires_in'])
+                async with httpx.AsyncClient() as client:
+                    kc_user_data = (await client.get(
+                        f'http://keycloak:8080/admin/realms/myrealm/users/{user_id}',
+                        headers={
+                            'Authorization': f'Bearer {backend_key["token"]}'
+                        }
+                    )).json()
+                user_data = {
+                    'id': kc_user_data['id'],
+                    'username': kc_user_data['username'],
+                    'given_name': kc_user_data['firstName'],
+                    'family_name': kc_user_data['lastName'],
+                    'email': kc_user_data['email'],
+                }
                 await querier.create_user(
                     id=user_data['id'],
                     username=user_data['username'],
@@ -64,7 +105,28 @@ class ProxyService(proxy_pb2_grpc.CentrifugoProxyServicer):
                 can_publish=True,
             )
             await connection.commit()
-        return proxy_pb2.SubscribeResponse()
+        return proxy_pb2.SubscribeResponse(
+            result=proxy_pb2.SubscribeResult(
+                info=json.dumps({"can_publish": "aaaa"}).encode()
+            )
+        )
+
+    async def Publish(
+        self,
+        request: proxy_pb2.PublishRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> proxy_pb2.PublishResponse:
+        async with engine.connect() as connection:
+            querier = ws_requests.AsyncQuerier(connection)
+            can_publish = await querier.user_can_publish(
+                user_id=request.user,
+                channel=request.channel,
+            )
+        if can_publish:
+            return proxy_pb2.PublishResponse()
+        return proxy_pb2.PublishResponse(
+            error=proxy_pb2.Error(code=103),
+        )
 
     async def RPC(
         self,
